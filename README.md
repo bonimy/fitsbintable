@@ -10,7 +10,7 @@ fname: Filename to FITS file to read PA values <br />
 Results are printed to stdout, so redirect is necessary (to 'output').
 
 # Exit codes
-    0   -   Normal termination <br />
+   0    -   Normal termination <br />
    -1   -   FITS table not a binary table <br />
    -2   -   Could not find specified key <br />
    -3   -   Column is not a floating point table <br />
