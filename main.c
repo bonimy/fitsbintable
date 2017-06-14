@@ -108,7 +108,7 @@ void printtable(const char* fname, const char* key)
         printerror(status);
 
     /* allocate space for PA values */
-    float* palist = (float*)malloc(nrows * sizeof(float*));
+    float* palist = (float*)malloc(nrows * sizeof(float));
 
     /* read the columns */
     float fnull = 0.0f;
