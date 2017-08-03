@@ -116,7 +116,12 @@ void printtable(const char* fname)
 
     /* print values */
     for (int i = 0; i < nrows; i++)
-        printf("%12.2f\n", palist[i]);
+    {
+        if (!inclist[i])
+            continue;
+
+        printf("%i %12.2f %12.2f\n", asclist[i], palist[i], mjdlist[i]);
+    }
 
     /* free table values */
     free(palist);
