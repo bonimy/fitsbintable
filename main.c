@@ -25,26 +25,45 @@ constants used in the interface.
 */
 #include "fitsio.h"
 
+#define PA_KEY      "PA"
+#define INC_KEY     "Included"
+#define MJD_KEY     "MJD"
+#define ASC_KEY     "ascending"
+
+typedef unsigned char byte;
+
 void printerror(const int status);
-void printtable(const char* fname, const char* key);
+void printtable(const char* fname);
+void getpalist(fitsfile *fptr, const char** ttype, const int nfound, int* status, float** palist, const long nrows);
+void getmjdlist(fitsfile *fptr, const char** ttype, const int nfound, int* status, double** mjdlist, const long nrows);
+void getasclist(fitsfile *fptr, const char** ttype, const int nfound, int* status, byte** asclist, const long nrows);
+void getinclist(fitsfile *fptr, const char** ttype, const int nfound, int* status, byte** inclist, const long nrows);
+
+int findkey(const char* key, const char** values, const int size)
+{
+    for (int col = 0; col < size; col++)
+    {
+        if (!_stricmp(key, values[col]))
+        {
+            /* Indexes are one-based, not zero-based */
+            return ++col;
+        }
+    }
+    printf("Could not find key \"%s\" in binary table.", key);
+    exit(-2);
+    return -1;
+}
 
 int main(int argc, char** argv)
 {
     for (int i = 1; i < argc; i++)
-        printtable(argv[i], "PA");
+        printtable(argv[i]);
 
     return 0;
 }
 
-int findkey(char* key, char** values, int size)
-{
-    for (int col = 0; col < size; col++)
-        if (!strcmp(key, values[col]))
-            return col;
-}
-
 /* read and print data values from an ASCII or binary table */
-void printtable(const char* fname, const char* key)
+void printtable(const char* fname)
 {
     /* open the FITS file. */
     int status = 0;
@@ -69,6 +88,11 @@ void printtable(const char* fname, const char* key)
     if (ffgncl(fptr, &ncols, &status))
         printerror(status);
 
+    /* get number of rows in table */
+    long nrows;
+    if (ffgnrw(fptr, &nrows, &status))
+        printerror(status);
+
     /* allocate space for type names of each column */
     char** ttype = (char**)malloc(ncols * sizeof(char*));
     for (int i = 0; i < ncols; i++)
@@ -79,42 +103,16 @@ void printtable(const char* fname, const char* key)
     if (ffgkns(fptr, "TTYPE", 1, ncols, ttype, &nfound, &status))
         printerror(status);
 
-    /* find column that has desired key */
-    int col = findkey(key, ttype, nfound);
-    if (col == -1)
-    {
-        printf("Could not find key \"%s\" in binary table.", key);
-        exit(-2);
-    }
-
-    /* Indexes are one-based, not zero-based */
-    ++col;
-
-    /* get typecode for column */
-    int typecode;
-    long repeat;
-    long width;
-    if (ffgtcl(fptr, col, &typecode, &repeat, &width, &status))
-        printerror(status);
-    if (typecode != TFLOAT)
-    {
-        printf("Type code for key %s is not of type TFLOAT", key);
-        exit(-3);
-    }
-
-    /* get number of rows in table */
-    long nrows;
-    if (ffgnrw(fptr, &nrows, &status))
-        printerror(status);
-
     /* allocate space for PA values */
-    float* palist = (float*)malloc(nrows * sizeof(float));
+    float* palist;
+    getpalist(fptr, ttype, nfound, &status, &palist, nrows);
 
-    /* read the columns */
-    float fnull = 0.0f;
-    int anynull;
-    if (ffgcv(fptr, typecode, col, 1, 1, nrows, &fnull, palist, &anynull, &status))
-        printerror(status);
+    double* mjdlist;
+    getmjdlist(fptr, ttype, nfound, &status, &mjdlist, nrows);
+
+    byte* inclist, *asclist;
+    getinclist(fptr, ttype, nfound, &status, &inclist, nrows);
+    getasclist(fptr, ttype, nfound, &status, &asclist, nrows);
 
     /* print values */
     for (int i = 0; i < nrows; i++)
@@ -131,6 +129,114 @@ void printtable(const char* fname, const char* key)
     /* Close the FITS file */
     if (ffclos(fptr, &status))
         printerror(status);
+}
+
+void getasclist(fitsfile *fptr, const char** ttype, const int nfound, int* status, byte** asclist, const long nrows)
+{
+    /* find column that has desired key */
+    int col = findkey(ASC_KEY, ttype, nfound);
+
+    /* get typecode for column */
+    int typecode;
+    long repeat;
+    long width;
+    if (ffgtcl(fptr, col, &typecode, &repeat, &width, status))
+        printerror(*status);
+    if (typecode != TBYTE)
+    {
+        printf("Type code for key %s is not of type TBYTE", ASC_KEY);
+        exit(-3);
+    }
+
+    /* allocate space for PA values */
+    *asclist = (byte*)malloc(nrows * sizeof(byte));
+
+    /* read the columns */
+    float fnull = 0.0f;
+    int anynull;
+    if (ffgcv(fptr, typecode, col, 1, 1, nrows, &fnull, *asclist, &anynull, status))
+        printerror(*status);
+}
+
+void getinclist(fitsfile *fptr, const char** ttype, const int nfound, int* status, byte** inclist, const long nrows)
+{
+    /* find column that has desired key */
+    int col = findkey(INC_KEY, ttype, nfound);
+
+    /* get typecode for column */
+    int typecode;
+    long repeat;
+    long width;
+    if (ffgtcl(fptr, col, &typecode, &repeat, &width, status))
+        printerror(*status);
+    if (typecode != TBYTE)
+    {
+        printf("Type code for key %s is not of type TBYTE", INC_KEY);
+        exit(-3);
+    }
+
+    /* allocate space for PA values */
+    *inclist = (byte*)malloc(nrows * sizeof(byte));
+
+    /* read the columns */
+    float fnull = 0.0f;
+    int anynull;
+    if (ffgcv(fptr, typecode, col, 1, 1, nrows, &fnull, *inclist, &anynull, status))
+        printerror(*status);
+}
+
+void getmjdlist(fitsfile *fptr, const char** ttype, const int nfound, int* status, double** mjdlist, const long nrows)
+{
+    /* find column that has desired key */
+    int col = findkey(MJD_KEY, ttype, nfound);
+
+    /* get typecode for column */
+    int typecode;
+    long repeat;
+    long width;
+    if (ffgtcl(fptr, col, &typecode, &repeat, &width, status))
+        printerror(*status);
+    if (typecode != TDOUBLE)
+    {
+        printf("Type code for key %s is not of type TDOUBLE", MJD_KEY);
+        exit(-3);
+    }
+
+    /* allocate space for PA values */
+    *mjdlist = (double*)malloc(nrows * sizeof(double));
+
+    /* read the columns */
+    float fnull = 0.0f;
+    int anynull;
+    if (ffgcv(fptr, typecode, col, 1, 1, nrows, &fnull, *mjdlist, &anynull, status))
+        printerror(*status);
+}
+
+void getpalist(fitsfile *fptr, const char** ttype, const int nfound, int* status, float** palist, const long nrows)
+{
+    /* find column that has desired key */
+    int col = findkey(PA_KEY, ttype, nfound);
+
+    /* get typecode for column */
+    int typecode;
+    long repeat;
+    long width;
+    if (ffgtcl(fptr, col, &typecode, &repeat, &width, status))
+        printerror(*status);
+    if (typecode != TFLOAT)
+    {
+        printf("Type code for key %s is not of type TFLOAT", PA_KEY);
+        exit(-3);
+    }
+
+    /* allocate space for PA values */
+    *palist = (float*)malloc(nrows * sizeof(float));
+
+    /* read the columns */
+    float fnull = 0.0f;
+    int anynull;
+    if (ffgcv(fptr, typecode, col, 1, 1, nrows, &fnull, *palist, &anynull, status))
+        printerror(*status);
 }
 
 /* Print out cfitsio error messages and exit program */
